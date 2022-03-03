@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Catalog.Repositories;
 using Catalog.Entities;
 using Catalog.Dtos;
+using Catalog.Service;
 
 namespace Catalog.Controllers
 {
@@ -12,26 +13,27 @@ namespace Catalog.Controllers
     [Route("items")]
     public class ItemsController : ControllerBase
     {
-        private readonly IItemsRepository repository;
-
-        public ItemsController(IItemsRepository repository)
+        private readonly IServiceCatalog service;
+        public ItemsController(IServiceCatalog service)
         {
-            this.repository = repository;
+            this.service = service;
         }
 
         [HttpGet] //! GET /items
         public IEnumerable<ItemDto> GetItems()
         {
-            var items = repository.GetItems().Select(item => item.AsDto());
+            // var items = repository.GetItems().Select(item => item.AsDto());
+            // return items;
+            var items = service.GetItems().Select(item => item.AsDto());
             return items;
         }
         [HttpGet("{id}")] //! GET /items/{id}
-        public ActionResult<ItemDto> GetItem(Guid id)
+        public ActionResult<ItemDto> GetItem(string id)
         {
-            var item = repository.GetItem(id);
+            var item = service.GetItem(id);
             if (item is null)
             {
-                return NotFound();
+                return NoContent();
             }
             return item.AsDto();
         }
@@ -39,43 +41,55 @@ namespace Catalog.Controllers
         [HttpPost]
         public ActionResult<ItemDto> CreateItem(CreateItemDto itemDto)
         {
-            Item item = new (){
-                Id = Guid.NewGuid(),
+            Item item = new()
+            {
+                Id = Guid.NewGuid()+"",
                 Name = itemDto.Name,
                 Price = itemDto.Price,
                 CreateDate = DateTimeOffset.UtcNow
             };
-            repository.CreateItem(item);
-            return CreatedAtAction(nameof(GetItem), new {id = item.Id}, item.AsDto());
+            if(service.CreateItem(item)){
+                return CreatedAtAction(nameof(GetItem), new { id = item.Id }, item.AsDto());
+            }
+            return null;
+            
         }
 
-        [HttpPut("{id}")]
-        public ActionResult UpdateItem(Guid id, UpdateItemDto itemDto)
+        [HttpPut("{id}")] //! GET /items/{id}
+        public ActionResult UpdateItem(string id, UpdateItemDto itemDto)
         {
-            var existingItem = repository.GetItem(id);
-            if (existingItem is null)
+            Item item = new()
             {
-                return NotFound();
-            }
-            Item updateItem = existingItem with
-            {
+                Id = id,
                 Name = itemDto.Name,
-                Price = itemDto.Price  
+                Price = itemDto.Price
             };
-            repository.UpdateItem(updateItem);
+            if (service.UpdateItem(id, item))
+            {
+                return NoContent();
+            }
+            return NotFound();
 
-            return NoContent();
         }
         [HttpDelete("{id}")]
-        public ActionResult DeleteItem(Guid id)
+        public ActionResult DeleteItem(string id)
         {
-            var existingItem = repository.GetItem(id);
-            if (existingItem is null)
+            if (service.DeleteItem(id))
             {
-                return NotFound();
+                return NoContent();
             }
-            repository.DeleteItem(id);
-            return NoContent();
+            return NotFound();
+        }
+        [HttpGet("linq")]
+        public IEnumerable<string> getScores()
+        {
+            int[] scores = { 90, 71, 82, 93, 75, 82 };
+            IEnumerable<string> highScoresQuery =
+                from score in scores
+                where score > 80
+                orderby score descending
+                select $"The score is {score}";
+            return highScoresQuery;
         }
     }
 }
